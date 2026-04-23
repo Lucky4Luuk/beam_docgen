@@ -1,12 +1,14 @@
-use crate::ir::*;
+use std::collections::HashMap;
+
+use parser::{ir::*, lookup::CodeFile};
 
 const TABLE_TEMPLATE: &'static str = include_str!("../assets/table.md");
 const FUNC_TEMPLATE: &'static str = include_str!("../assets/function.md");
 
-pub fn gen_page_md(node: Node) -> String {
+pub fn gen_page_md(node: Node, code: &HashMap<String, CodeFile>) -> String {
     match node {
         Node::Table(t) => gen_table_page_md(t),
-        Node::Function(f) => gen_function_page_md(f),
+        Node::Function(f) => gen_function_page_md(f, code),
     }
 }
 
@@ -36,19 +38,51 @@ pub fn gen_table_page_md(table: Table) -> String {
         .replace("{{TABLE_FUNCTIONS}}", &functions_content.join("\n"))
 }
 
-pub fn gen_function_page_md(function: Function) -> String {
+pub fn gen_function_page_md(function: Function, code: &HashMap<String, CodeFile>) -> String {
     let Function {
         full_name,
         name,
-        source,
-        func_def,
-        func_def_line,
+        info,
+        callers,
     } = function;
+
+    let func_def = if let Some(cf) = code.get(&info.source)
+        && info.func_def_lines.0 >= 0
+    {
+        cf.get_section(
+            info.func_def_lines.0 as usize,
+            info.func_def_lines.1 as usize,
+        )
+        .join("\n")
+    } else {
+        format!("function {name}(...)")
+    };
+
+    let mut func_callers = Vec::new();
+    for (src, line_numbers) in &callers {
+        if let Some(cf) = code.get(src) {
+            let mut s = vec![format!("<details><summary>@/{src}</summary>")];
+            for i in line_numbers {
+                if src == &info.source && (*i as isize) == info.func_def_lines.0 {
+                    continue;
+                }
+                let call_code = cf.get_section(i - 1, i + 1).join("\n");
+                s.push(format!(
+                    "<pre><code class=\"highlight-lua\" data-ln-start-from=\"{}\">{call_code}</code></pre>", i - 1
+                ));
+            }
+            if s.len() > 1 {
+                s.push(String::from("</details>"));
+                func_callers.push(s.join("\n"));
+            }
+        }
+    }
 
     FUNC_TEMPLATE
         .replace("{{FUNC_NAME}}", &name)
         .replace("{{FUNC_FULL_NAME}}", &full_name)
-        .replace("{{FUNC_SRC}}", &source)
+        .replace("{{FUNC_SRC}}", &info.source)
         .replace("{{FUNC_DEF}}", &func_def)
-        .replace("{{FUNC_DEF_LINE}}", &func_def_line.to_string())
+        .replace("{{FUNC_DEF_LINE}}", &info.func_def_lines.0.to_string())
+        .replace("{{FUNC_CALLERS}}", &func_callers.join("\n"))
 }

@@ -1,7 +1,13 @@
 use markdown::{CompileOptions, Options};
-use parser::{data, ir};
+use parser::{
+    ir::{Node, Table},
+    lookup::{self, CodeFile},
+};
 
-use std::{collections::VecDeque, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 
 use axum::{
     Router,
@@ -15,25 +21,26 @@ use tower_http::services::ServeDir;
 
 mod markdown_gen;
 
-const GAME_DIR: &str = "H:/SteamLibrary/steamapps/common/BeamNG.drive/";
-
 const PAGE_404: &str = include_str!("../assets/404.md");
 
 struct AppState {
     html_template: String,
 
-    ge_data: ir::Table,
-    ve_data: ir::Table,
+    ge_data: Table,
+    ve_data: Table,
+
+    code: HashMap<String, CodeFile>,
 }
 
 impl AppState {
-    fn new(ge_data: ir::Table, ve_data: ir::Table) -> Self {
+    fn new(ge_data: Table, ve_data: Table, code: HashMap<String, CodeFile>) -> Self {
         let html_template =
             std::fs::read_to_string("assets/template.html").expect("Could not find HTML template!");
         Self {
             html_template,
             ge_data,
             ve_data,
+            code,
         }
     }
 
@@ -59,13 +66,13 @@ impl AppState {
         self.template_page(PAGE_404)
     }
 
-    fn get_data(&self, path: Vec<String>) -> Option<ir::Node> {
+    fn get_data(&self, path: Vec<String>) -> Option<Node> {
         let first = path.first()?;
         match first.as_str() {
             "GE" => {
                 let remaining: VecDeque<String> = path.into_iter().skip(1).collect();
                 if remaining.is_empty() {
-                    Some(ir::Node::Table(self.ge_data.clone()))
+                    Some(Node::Table(self.ge_data.clone()))
                 } else {
                     self.ge_data.get_data(remaining)
                 }
@@ -73,7 +80,7 @@ impl AppState {
             "VE" => {
                 let remaining: VecDeque<String> = path.into_iter().skip(1).collect();
                 if remaining.is_empty() {
-                    Some(ir::Node::Table(self.ve_data.clone()))
+                    Some(Node::Table(self.ve_data.clone()))
                 } else {
                     self.ve_data.get_data(remaining)
                 }
@@ -86,49 +93,72 @@ impl AppState {
         let path_split: Vec<_> = path.split("/").map(|s| s.to_string()).collect();
 
         let node = self.get_data(path_split)?;
-        let md = markdown_gen::gen_page_md(node);
+        let md = markdown_gen::gen_page_md(node, &self.code);
         Some(md)
     }
 }
 
 #[tokio::main]
 async fn main() {
-    let ge_raw = std::fs::read_to_string("GE.json").expect("Failed to read GE data!");
-    let ve_raw = std::fs::read_to_string("VE.json").expect("Failed to read VE data!");
+    let code_json = std::fs::read_to_string("code_files.json").expect("Failed to read GE data!");
+    let ge_json = std::fs::read_to_string("GE_parsed.json").expect("Failed to read GE data!");
+    let ve_json = std::fs::read_to_string("VE_parsed.json").expect("Failed to read VE data!");
 
-    let ge_parsed = data::ApiData::from_json(&ge_raw).expect("Failed to parse json data!");
+    let code: HashMap<String, CodeFile> =
+        serde_json::from_str(&code_json).expect("Failed to parse json data!");
+
+    let mut ge: Table = serde_json::from_str(&ge_json).expect("Failed to parse json data!");
     println!("Parsed GE data succesfully!");
 
-    let ve_parsed = data::ApiData::from_json(&ve_raw).expect("Failed to parse json data!");
+    let mut ve: Table = serde_json::from_str(&ve_json).expect("Failed to parse json data!");
     println!("Parsed VE data succesfully!");
 
-    if let data::Node::Table(ge_table) = ge_parsed.root
-        && let data::Node::Table(ve_table) = ve_parsed.root
-    {
-        let mut ge_node = ir::Table::from_data_table(GAME_DIR, "", ge_table);
-        ge_node.sort_alphanumerical();
+    ge.sort_alphanumerical();
+    ve.sort_alphanumerical();
 
-        let mut ve_node = ir::Table::from_data_table(GAME_DIR, "", ve_table);
-        ve_node.sort_alphanumerical();
+    let app_state = Arc::new(AppState::new(ge, ve, code));
+    println!("App state succesfully created!");
 
-        let app_state = Arc::new(AppState::new(ge_node, ve_node));
-        println!("App state succesfully created!");
+    let app = Router::new()
+        .route("/", get(root))
+        .nest_service(
+            "/static",
+            ServiceBuilder::new().service(ServeDir::new("static")),
+        )
+        .route("/{*article_name}", get(article_resolver))
+        .with_state(app_state);
 
-        let app = Router::new()
-            .route("/", get(root))
-            .nest_service(
-                "/static",
-                ServiceBuilder::new().service(ServeDir::new("static")),
-            )
-            .route("/{*article_name}", get(article_resolver))
-            .with_state(app_state);
+    println!("Starting the web server now...");
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 
-        println!("Starting the web server now...");
-        let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-        axum::serve(listener, app).await.unwrap();
-    } else {
-        panic!("Not yet supported to start with anything besides a table!");
-    }
+    // if let data::Node::Table(ge_table) = ge_parsed.root
+    //     && let data::Node::Table(ve_table) = ve_parsed.root
+    // {
+    //     let mut ge_node = ir::Table::from_data_table("", ge_table);
+    //     ge_node.sort_alphanumerical();
+
+    //     let mut ve_node = ir::Table::from_data_table("", ve_table);
+    //     ve_node.sort_alphanumerical();
+
+    //     let app_state = Arc::new(AppState::new(ge_node, ve_node));
+    //     println!("App state succesfully created!");
+
+    //     let app = Router::new()
+    //         .route("/", get(root))
+    //         .nest_service(
+    //             "/static",
+    //             ServiceBuilder::new().service(ServeDir::new("static")),
+    //         )
+    //         .route("/{*article_name}", get(article_resolver))
+    //         .with_state(app_state);
+
+    //     println!("Starting the web server now...");
+    //     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    //     axum::serve(listener, app).await.unwrap();
+    // } else {
+    //     panic!("Not yet supported to start with anything besides a table!");
+    // }
 }
 
 async fn root(s: State<Arc<AppState>>) -> (StatusCode, Html<String>) {

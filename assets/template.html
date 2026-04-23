@@ -1,26 +1,31 @@
-<header>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!--<link
+<!doctype html>
+<html>
+    <header>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <!--<link
         rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/sakura.css/css/sakura.css"
         type="text/css"
     />-->
-    <link rel="stylesheet" href="{{URL_PREFIX}}/static/sakura.css" />
+        <link rel="stylesheet" href="{{URL_PREFIX}}/static/sakura.css" />
 
-    <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/dark.min.css"
-    />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/dark.min.css"
+        />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+        <script src="//cdn.jsdelivr.net/npm/highlightjs-line-numbers.js@2.9.0/dist/highlightjs-line-numbers.min.js"></script>
 
-    <script>
-        hljs.highlightAll();
-    </script>
-</header>
+        <script>
+            hljs.highlightAll();
+            hljs.initLineNumbersOnLoad();
+        </script>
+    </header>
 
-<body>
-    <div class="page">
-        <h1>GE Lua Documentation</h1>
-        {{PAGE_CONTENT}}
-    </div>
-</body>
+    <body>
+        <div class="page">
+            <h1>GE Lua Documentation</h1>
+            {{PAGE_CONTENT}}
+        </div>
+    </body>
+</html>

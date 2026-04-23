@@ -21,6 +21,7 @@ use tower_http::services::ServeDir;
 
 mod markdown_gen;
 
+const PAGE_ROOT: &str = include_str!("../assets/root.md");
 const PAGE_SEARCH: &str = include_str!("../assets/search.md");
 const PAGE_404: &str = include_str!("../assets/404.md");
 
@@ -78,6 +79,10 @@ impl AppState {
             .replace("{{TLN}}", tln)
             .replace("{{PAGE_CONTENT}}", &md_html)
             .replace("{{URL_PREFIX}}", "http://localhost:3000")
+    }
+
+    fn get_root(&self) -> String {
+        self.template_page("BeamNG", PAGE_ROOT)
     }
 
     fn get_404(&self) -> String {
@@ -145,7 +150,7 @@ impl AppState {
             inner_query_dist(query, a).min(inner_query_dist(query, b))
         }
 
-        pub fn inner_query_dist(query: &str, candidate: &str) -> f32 {
+        fn inner_query_dist(query: &str, candidate: &str) -> f32 {
             if query.is_empty() {
                 return candidate.len() as f32;
             }
@@ -277,8 +282,9 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn root(s: State<Arc<AppState>>) -> (StatusCode, Html<String>) {
-    article_resolver(Path(String::from("root")), s).await
+async fn root(State(state): State<Arc<AppState>>) -> (StatusCode, Html<String>) {
+    let page = state.get_root();
+    (StatusCode::OK, Html(page))
 }
 
 async fn search(

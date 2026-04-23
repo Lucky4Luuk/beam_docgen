@@ -21,6 +21,7 @@ use tower_http::services::ServeDir;
 
 mod markdown_gen;
 
+const PAGE_SEARCH: &str = include_str!("../assets/search.md");
 const PAGE_404: &str = include_str!("../assets/404.md");
 
 struct AppState {
@@ -30,17 +31,33 @@ struct AppState {
     ve_data: Table,
 
     code: HashMap<String, CodeFile>,
+
+    // Caches to speed up searching
+    all_func_names: Vec<(String, String)>,
+    all_child_names: Vec<(String, String)>,
 }
 
 impl AppState {
     fn new(ge_data: Table, ve_data: Table, code: HashMap<String, CodeFile>) -> Self {
         let html_template =
             std::fs::read_to_string("assets/template.html").expect("Could not find HTML template!");
+
+        let mut all_func_names = ge_data.get_all_function_names();
+        all_func_names.append(&mut ve_data.get_all_function_names());
+
+        let mut all_child_names = ge_data.get_all_children_names();
+        all_child_names.append(&mut ve_data.get_all_children_names());
+
         Self {
             html_template,
+
             ge_data,
             ve_data,
+
             code,
+
+            all_func_names,
+            all_child_names,
         }
     }
 
@@ -110,6 +127,118 @@ impl AppState {
         };
         Some((first, md))
     }
+
+    fn get_search_page(&self, query: &str) -> String {
+        let search_results = self.search_docs(query);
+        let mut content = Vec::new();
+        for (full_name, _, _) in search_results {
+            let link = full_name.replace(".", "/");
+            content.push(format!("- [`{}`](<{}>)", full_name, link));
+        }
+        let content = content.join("\n");
+        let content = PAGE_SEARCH.replace("{{SEARCH_RESULTS}}", &content);
+        self.template_page("BeamNG", &content)
+    }
+
+    fn search_docs(&self, query: &str) -> Vec<(&String, &String, usize)> {
+        fn query_dist(query: &str, a: &str, b: &str) -> f32 {
+            inner_query_dist(query, a).min(inner_query_dist(query, b))
+        }
+
+        pub fn inner_query_dist(query: &str, candidate: &str) -> f32 {
+            if query.is_empty() {
+                return candidate.len() as f32;
+            }
+            if candidate.is_empty() {
+                return query.len() as f32;
+            }
+
+            let q = query.as_bytes();
+            let c = candidate.as_bytes();
+
+            let mut prev: Vec<u16> = (0..=c.len() as u16).collect();
+            let mut curr = vec![0u16; c.len() + 1];
+
+            for (i, &qb) in q.iter().enumerate() {
+                curr[0] = (i + 1) as u16;
+
+                for (j, &cb) in c.iter().enumerate() {
+                    let cost = if qb == cb { 0 } else { 1 };
+
+                    let del = prev[j + 1] + 1;
+                    let ins = curr[j] + 1;
+                    let sub = prev[j] + cost;
+
+                    curr[j + 1] = del.min(ins).min(sub);
+                }
+
+                std::mem::swap(&mut prev, &mut curr);
+            }
+
+            let mut dist = prev[c.len()] as f32;
+
+            // --- Substring bonus (big impact for search quality) ---
+            let lcs = longest_common_substring(q, c) as f32;
+            dist -= lcs * 0.7; // tune weight
+
+            // --- Prefix bonus (important for function names) ---
+            let prefix = common_prefix_len(q, c) as f32;
+            dist -= prefix * 0.5;
+
+            dist.max(0.0)
+        }
+
+        fn longest_common_substring(a: &[u8], b: &[u8]) -> usize {
+            let mut dp = vec![0; b.len() + 1];
+            let mut max_len = 0;
+
+            for i in 0..a.len() {
+                let mut prev = 0;
+                for j in 0..b.len() {
+                    let temp = dp[j + 1];
+                    if a[i] == b[j] {
+                        dp[j + 1] = prev + 1;
+                        max_len = max_len.max(dp[j + 1]);
+                    } else {
+                        dp[j + 1] = 0;
+                    }
+                    prev = temp;
+                }
+            }
+
+            max_len
+        }
+
+        fn common_prefix_len(a: &[u8], b: &[u8]) -> usize {
+            a.iter().zip(b.iter()).take_while(|(x, y)| x == y).count()
+        }
+
+        let searchers = self
+            .all_func_names
+            .iter()
+            .chain(self.all_child_names.iter())
+            .collect::<Vec<_>>();
+
+        let max_dist = 3;
+        let mut dists = searchers
+            .into_iter()
+            .filter_map(|(full_name, name)| {
+                let dist = query_dist(query, full_name, name);
+                let dist = (dist * 2.0) as usize;
+                if dist < max_dist {
+                    Some((full_name, name, dist))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        dists.sort_by_key(|(_, _, dist)| *dist);
+
+        dists.truncate(25);
+
+        dists
+    }
 }
 
 #[tokio::main]
@@ -139,6 +268,7 @@ async fn main() {
             "/static",
             ServiceBuilder::new().service(ServeDir::new("static")),
         )
+        .route("/search", get(search))
         .route("/{*article_name}", get(article_resolver))
         .with_state(app_state);
 
@@ -149,6 +279,15 @@ async fn main() {
 
 async fn root(s: State<Arc<AppState>>) -> (StatusCode, Html<String>) {
     article_resolver(Path(String::from("root")), s).await
+}
+
+async fn search(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
+) -> (StatusCode, Html<String>) {
+    let query = params.get("q").map(String::as_str).unwrap_or("");
+    let generated = state.get_search_page(query);
+    (StatusCode::OK, Html(generated))
 }
 
 async fn article_resolver(

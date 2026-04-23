@@ -19,6 +19,165 @@
         <script>
             hljs.highlightAll();
             hljs.initLineNumbersOnLoad();
+
+            document.addEventListener("DOMContentLoaded", function () {
+                const searchInput = document.getElementById("doc-search");
+                const pageContent = document.getElementById("page-content");
+                const currentUrl = new URL(window.location.href);
+                const currentQuery = currentUrl.searchParams.get("q") || "";
+                let searchDebounceTimer = null;
+                let activeSearchController = null;
+                let lastRequestedQuery = currentQuery.trim();
+
+                if (searchInput) {
+                    searchInput.value = currentQuery;
+                }
+
+                function rehighlightContent() {
+                    if (window.hljs) {
+                        document
+                            .querySelectorAll("#page-content pre code")
+                            .forEach(function (block) {
+                                hljs.highlightElement(block);
+                            });
+                    }
+
+                    if (window.hljs && hljs.initLineNumbersOnLoad) {
+                        document
+                            .querySelectorAll("#page-content pre code")
+                            .forEach(function (block) {
+                                if (!block.dataset.lineNumbersApplied) {
+                                    hljs.lineNumbersBlock(block);
+                                    block.dataset.lineNumbersApplied = "true";
+                                }
+                            });
+                    }
+                }
+
+                async function submitSearch() {
+                    const query = searchInput?.value.trim() || "";
+
+                    if (!pageContent || query === lastRequestedQuery) {
+                        return;
+                    }
+
+                    const url = new URL(
+                        "{{URL_PREFIX}}/search",
+                        window.location.origin,
+                    );
+
+                    if (query) {
+                        url.searchParams.set("q", query);
+                    }
+
+                    if (activeSearchController) {
+                        activeSearchController.abort();
+                    }
+
+                    activeSearchController = new AbortController();
+
+                    try {
+                        pageContent.setAttribute("aria-busy", "true");
+
+                        const response = await fetch(url.toString(), {
+                            signal: activeSearchController.signal,
+                            headers: {
+                                "X-Requested-With": "fetch",
+                            },
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(
+                                "Search request failed with status " +
+                                    response.status,
+                            );
+                        }
+
+                        const html = await response.text();
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, "text/html");
+                        const nextPageContent =
+                            doc.getElementById("page-content");
+
+                        pageContent.innerHTML = nextPageContent
+                            ? nextPageContent.innerHTML
+                            : html;
+
+                        window.history.replaceState(
+                            {},
+                            "",
+                            url.pathname + url.search,
+                        );
+
+                        lastRequestedQuery = query;
+                        rehighlightContent();
+                    } catch (error) {
+                        if (error.name !== "AbortError") {
+                            console.error("Search update failed:", error);
+                        }
+                    } finally {
+                        pageContent.removeAttribute("aria-busy");
+                    }
+                }
+
+                function scheduleSearch() {
+                    if (searchDebounceTimer) {
+                        clearTimeout(searchDebounceTimer);
+                    }
+
+                    searchDebounceTimer = setTimeout(function () {
+                        submitSearch();
+                    }, 300);
+                }
+
+                document.addEventListener("keydown", function (event) {
+                    if (
+                        event.key.toLowerCase() === "f" &&
+                        !event.ctrlKey &&
+                        !event.metaKey &&
+                        !event.altKey
+                    ) {
+                        const activeTag = document.activeElement?.tagName;
+                        const isTypingTarget =
+                            document.activeElement?.isContentEditable ||
+                            activeTag === "INPUT" ||
+                            activeTag === "TEXTAREA" ||
+                            activeTag === "SELECT";
+
+                        if (
+                            isTypingTarget &&
+                            document.activeElement === searchInput
+                        ) {
+                            return;
+                        }
+
+                        event.preventDefault();
+                        searchInput?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                        });
+                        searchInput?.focus();
+                        searchInput?.select();
+                    }
+                });
+
+                searchInput?.addEventListener("input", function () {
+                    scheduleSearch();
+                });
+
+                searchInput?.addEventListener("keydown", function (event) {
+                    if (event.key === "Enter") {
+                        event.preventDefault();
+
+                        if (searchDebounceTimer) {
+                            clearTimeout(searchDebounceTimer);
+                            searchDebounceTimer = null;
+                        }
+
+                        submitSearch();
+                    }
+                });
+            });
         </script>
 
         <style>
@@ -49,7 +208,14 @@
                 <h1>{{TLN}} Lua Documentation</h1>
                 <small><i>Press F to search!</i></small>
             </div>
-            {{PAGE_CONTENT}}
+            <input
+                id="doc-search"
+                type="search"
+                placeholder="Search documentation..."
+                aria-label="Search documentation"
+                style="width: 100%; margin: 0 0 1rem 0"
+            />
+            <div id="page-content">{{PAGE_CONTENT}}</div>
         </div>
     </body>
 </html>

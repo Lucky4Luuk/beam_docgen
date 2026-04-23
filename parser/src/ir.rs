@@ -89,7 +89,21 @@ impl Table {
         }
     }
 
-    pub fn get_all_functions(&self) -> Vec<(String, String)> {
+    pub fn get_all_children_names(&self) -> Vec<(String, String)> {
+        let mut children: Vec<(String, String)> = self
+            .children
+            .iter()
+            .map(|f| (f.full_name.clone(), f.name.clone()))
+            .collect();
+
+        for child in &self.children {
+            children.append(&mut child.get_all_children_names());
+        }
+
+        children
+    }
+
+    pub fn get_all_function_names(&self) -> Vec<(String, String)> {
         let mut funcs: Vec<(String, String)> = self
             .functions
             .iter()
@@ -97,7 +111,7 @@ impl Table {
             .collect();
 
         for child in &self.children {
-            funcs.append(&mut child.get_all_functions());
+            funcs.append(&mut child.get_all_function_names());
         }
 
         funcs

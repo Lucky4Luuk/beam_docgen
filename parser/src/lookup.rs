@@ -178,7 +178,7 @@ fn load_all_files(game_dir: &str, file_paths: Vec<PathBuf>) -> Vec<CodeFile> {
 
 pub fn look_up_src_info(root: &mut Table, game_dir: &str) -> HashMap<String, CodeFile> {
     // First we must extract every function name and full name
-    let look_ups = root.get_all_functions();
+    let look_ups = root.get_all_function_names();
     println!("Functions to look up: {}", look_ups.len());
 
     // Secondly, we must extract a list of every single lua/js file

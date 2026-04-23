@@ -6,21 +6,24 @@ const TABLE_TEMPLATE: &str = include_str!("../assets/table.md");
 const FUNC_TEMPLATE: &str = include_str!("../assets/function.md");
 
 pub fn gen_page_md_template(
-    func_template: &str,
+    template: &str,
     node: Node,
     code: &HashMap<String, CodeFile>,
 ) -> String {
     match node {
-        Node::Table(t) => gen_table_page_md(t),
-        Node::Function(f) => gen_function_page_md(func_template, f, code),
+        Node::Table(t) => gen_table_page_md(template, t),
+        Node::Function(f) => gen_function_page_md(template, f, code),
     }
 }
 
 pub fn gen_page_md(node: Node, code: &HashMap<String, CodeFile>) -> String {
-    gen_page_md_template(FUNC_TEMPLATE, node, code)
+    match node {
+        Node::Table(_) => gen_page_md_template(TABLE_TEMPLATE, node, code),
+        Node::Function(_) => gen_page_md_template(FUNC_TEMPLATE, node, code),
+    }
 }
 
-pub fn gen_table_page_md(table: Table) -> String {
+pub fn gen_table_page_md(template: &str, table: Table) -> String {
     let Table {
         full_name,
         name,
@@ -31,15 +34,15 @@ pub fn gen_table_page_md(table: Table) -> String {
     let mut children_content = Vec::new();
     for child in children {
         let link = child.full_name.replace(".", "/");
-        children_content.push(format!("- [`{}`]({})", child.name, link));
+        children_content.push(format!("- [`{}`](<{}>)", child.name, link));
     }
     let mut functions_content = Vec::new();
     for func in functions {
         let link = func.full_name.replace(".", "/");
-        functions_content.push(format!("- [`function {}`]({})", func.name, link));
+        functions_content.push(format!("- [`function {}`](<{}>)", func.name, link));
     }
 
-    TABLE_TEMPLATE
+    template
         .replace("{{TABLE_NAME}}", &name)
         .replace("{{TABLE_FULL_NAME}}", &full_name)
         .replace("{{TABLE_CHILDREN}}", &children_content.join("\n"))

@@ -44,7 +44,7 @@ impl AppState {
         }
     }
 
-    fn template_page(&self, md: &str) -> String {
+    fn template_page(&self, tln: &str, md: &str) -> String {
         let md_html = markdown::to_html_with_options(
             md,
             &Options {
@@ -58,12 +58,13 @@ impl AppState {
         )
         .unwrap();
         self.html_template
+            .replace("{{TLN}}", tln)
             .replace("{{PAGE_CONTENT}}", &md_html)
             .replace("{{URL_PREFIX}}", "http://localhost:3000")
     }
 
     fn get_404(&self) -> String {
-        self.template_page(PAGE_404)
+        self.template_page("BeamNG", PAGE_404)
     }
 
     fn get_data(&self, path: Vec<String>) -> Option<Node> {
@@ -89,11 +90,12 @@ impl AppState {
         }
     }
 
-    fn get_page(&self, path: String) -> Option<String> {
-        let path = path.trim_start_matches('/').to_string();
+    fn get_page(&self, path: String) -> Option<(String, String)> {
+        let path = path.trim_matches('/').to_string();
         let path_md = format!("content/{}.md", path);
 
         let path_split: Vec<_> = path.split("/").map(|s| s.to_string()).collect();
+        let first = path_split.first()?.clone();
 
         let node = self.get_data(path_split)?;
         let md = if std::path::Path::new(&path_md).exists() {
@@ -106,7 +108,7 @@ impl AppState {
         } else {
             markdown_gen::gen_page_md(node, &self.code)
         };
-        Some(md)
+        Some((first, md))
     }
 }
 
@@ -154,8 +156,8 @@ async fn article_resolver(
     State(state): State<Arc<AppState>>,
 ) -> (StatusCode, Html<String>) {
     let path = path.trim_end_matches('/').to_string();
-    if let Some(content) = state.get_page(path) {
-        let generated = state.template_page(&content);
+    if let Some((tln, content)) = state.get_page(path) {
+        let generated = state.template_page(&tln, &content);
         (StatusCode::OK, Html(generated))
     } else {
         (StatusCode::NOT_FOUND, Html(state.get_404()))

@@ -23,15 +23,17 @@ struct AppState {
     html_template: String,
 
     ge_data: ir::Table,
+    ve_data: ir::Table,
 }
 
 impl AppState {
-    fn new(ge_data: ir::Table) -> Self {
+    fn new(ge_data: ir::Table, ve_data: ir::Table) -> Self {
         let html_template =
             std::fs::read_to_string("assets/template.html").expect("Could not find HTML template!");
         Self {
             html_template,
             ge_data,
+            ve_data,
         }
     }
 
@@ -68,7 +70,14 @@ impl AppState {
                     self.ge_data.get_data(remaining)
                 }
             }
-            "VE" => todo!(),
+            "VE" => {
+                let remaining: VecDeque<String> = path.into_iter().skip(1).collect();
+                if remaining.is_empty() {
+                    Some(ir::Node::Table(self.ve_data.clone()))
+                } else {
+                    self.ve_data.get_data(remaining)
+                }
+            }
             _ => None,
         }
     }
@@ -84,16 +93,25 @@ impl AppState {
 
 #[tokio::main]
 async fn main() {
-    let raw = std::fs::read_to_string("GE.json").expect("Failed to read file!");
+    let ge_raw = std::fs::read_to_string("GE.json").expect("Failed to read GE data!");
+    let ve_raw = std::fs::read_to_string("VE.json").expect("Failed to read VE data!");
 
-    let parsed = data::ApiData::from_json(&raw).expect("Failed to parse json data!");
-    println!("Parsed data succesfully!");
+    let ge_parsed = data::ApiData::from_json(&ge_raw).expect("Failed to parse json data!");
+    println!("Parsed GE data succesfully!");
 
-    if let data::Node::Table(table) = parsed.root {
-        let mut ge_node = ir::Table::from_data_table(GAME_DIR, "", table);
+    let ve_parsed = data::ApiData::from_json(&ve_raw).expect("Failed to parse json data!");
+    println!("Parsed VE data succesfully!");
+
+    if let data::Node::Table(ge_table) = ge_parsed.root
+        && let data::Node::Table(ve_table) = ve_parsed.root
+    {
+        let mut ge_node = ir::Table::from_data_table(GAME_DIR, "", ge_table);
         ge_node.sort_alphanumerical();
 
-        let app_state = Arc::new(AppState::new(ge_node));
+        let mut ve_node = ir::Table::from_data_table(GAME_DIR, "", ve_table);
+        ve_node.sort_alphanumerical();
+
+        let app_state = Arc::new(AppState::new(ge_node, ve_node));
         println!("App state succesfully created!");
 
         let app = Router::new()

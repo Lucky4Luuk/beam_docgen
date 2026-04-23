@@ -34,15 +34,11 @@ end
 
 -- Takes a function, figures out as much info about it as possible and turns
 -- it into its docs representation (a map of info)
-M.function_to_docs = function(name, f)
+M.function_to_docs = function(r, name, f)
     local info = debug.getinfo(f)
 
-    local t = {}
-
-    t["Function"] = { source = info.source, linedefined = info.linedefined, lastlinedefined = info.lastlinedefined }
-    t["Function"].__docs_name = name
-
-    return t
+    r["Function"] = { source = info.source, linedefined = info.linedefined, lastlinedefined = info.lastlinedefined }
+    r["Function"].__docs_name = name
 end
 
 -- Generates the right structure to denote a reference cycle for the docs
@@ -54,9 +50,7 @@ M.ref_cycle_to_docs = function(name)
 end
 
 -- Turns a table into its docs representation
--- Essentially, this will turn a lua table into a json compatible table
-M.table_to_docs = function(name, t, seen)
-    local r = {}
+M.table_to_docs = function(r, name, t, seen, next_wave)
     r["Table"] = {}
     r["Table"].__docs_name = name
     table.insert(seen, tostring(t))
@@ -70,7 +64,10 @@ M.table_to_docs = function(name, t, seen)
             if arrContains(seen, tostring(v)) then -- we want to skip anything we have already seen to avoid looping references
                 r["Table"][k] = M.ref_cycle_to_docs(kname)
             else
-                r["Table"][k] = M.to_docs(kname, v, seen)
+                -- r["Table"][k] = M.to_docs(kname, v, seen)
+                -- We need to allocate a table in r to work in for the next wave
+                r["Table"][k] = { alloc = true }
+                table.insert(next_wave, { kname = kname, v = v, ref = r["Table"][k] })
             end
         end
     end
@@ -78,39 +75,48 @@ M.table_to_docs = function(name, t, seen)
     return r
 end
 
--- Turns any lua value into its docs representation (returns a table)
-M.to_docs = function(name, v, seen)
-    if type(name) ~= "string" then
-        print(type(name))
-    end
+M.to_docs_wave = function(r, name, v, seen, next_wave)
     local kind = type(v)
     if kind == "table" then
-        return M.table_to_docs(name, v, seen)
+        M.table_to_docs(r, name, v, seen, next_wave)
     elseif kind == "function" then
-        return M.function_to_docs(name, v)
+        M.function_to_docs(r, name, v)
     elseif kind == "string" or kind == "number" or kind == "boolean" or kind == "nil" then -- All of these can be directly passed through
-        local r = {}
         r["Value"] = { v = tostring(v) }
         r["Value"].__docs_name = name
-        return r
     elseif kind == "userdata" then
         -- Mostlikely this is something like the `obj` table in VE lua, where you can just call getmetatable on it
         local t = getmetatable(v)
         if t ~= nil and t[1] ~= nil then
             -- print("Userdata " .. name .. " has a valid metatable. Adding it...")
-            return M.table_to_docs(name, t[1], seen)
+            M.table_to_docs(r, name, t[1], seen, next_wave)
         else
-            local r = {}
             r["Other"] = { kind = "<" .. kind .. ">" }
             r["Other"].__docs_name = name
-            return r
         end
     else
-        local r = {}
         r["Other"] = { kind = "<" .. kind .. ">" }
         r["Other"].__docs_name = name
-        return r
     end
+end
+
+-- Turns any lua value into its docs representation (returns a table)
+M.to_docs = function(name, v, seen)
+    local r = {}
+    local next_wave = {}
+    M.to_docs_wave(r, name, v, seen, next_wave)
+
+    while #next_wave > 0 do
+        local current_wave = next_wave
+        next_wave = {}
+
+        for _, item in ipairs(current_wave) do
+            item.ref.alloc = nil
+            M.to_docs_wave(item.ref, item.kname, item.v, seen, next_wave)
+        end
+    end
+
+    return r
 end
 
 -- Generates documentation as JSON data

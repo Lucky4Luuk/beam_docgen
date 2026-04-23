@@ -53,12 +53,17 @@ fn table_to_md(table: &Table) -> String {
 
 fn function_to_md(function: &Function) -> String {
     let Function {
-        full_name, name, ..
+        full_name,
+        name,
+        source,
+        func_def,
+        func_def_line,
     } = function;
     format!(
-        "<details><summary>function {full_name}</summary><pre><code>
-function {name}
-</pre></code></details>
+        "<details><summary>function {full_name}</summary><pre><code class=\"language-lua\">
+-- @/{source}:{func_def_line}
+{func_def}
+</code></pre></details>
 "
     )
 }

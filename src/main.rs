@@ -1,6 +1,8 @@
 use beam_dump_parser::{data, ir, markdown_gen};
 use markdown::{CompileOptions, Options};
 
+const GAME_DIR: &'static str = "H:/SteamLibrary/steamapps/common/BeamNG.drive/";
+
 const HTML_TEMPLATE: &'static str = include_str!("../assets/template.html");
 const SAKURA_CSS: &'static str = include_str!("../assets/sakura.css");
 
@@ -11,7 +13,8 @@ fn main() {
     println!("Parsed data succesfully!");
 
     if let data::Node::Table(table) = parsed.root {
-        let root = ir::Table::from_data_table("", table);
+        let mut root = ir::Table::from_data_table(GAME_DIR, "", table);
+        root.sort_alphanumerical();
 
         let md = markdown_gen::gen_md(root);
         std::fs::write("GE.md", &md).expect("Failed to write MD to file!");

@@ -16,6 +16,8 @@ pub struct Function {
     #[serde(rename = "__docs_name")]
     pub docs_name: String,
     pub source: String,
+    pub linedefined: isize,
+    pub lastlinedefined: isize,
 }
 
 #[derive(Debug, Deserialize)]

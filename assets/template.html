@@ -1,23 +1,17 @@
 <header>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!--<link rel="stylesheet" href="{{URL_PREFIX}}/static/sakura.css" />-->
     <!--<link
         rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/sakura.css/css/sakura.css"
         type="text/css"
     />-->
-    <style>
-        {{SAKURA_CSS}}
-    </style>
+    <link rel="stylesheet" href="{{URL_PREFIX}}/static/sakura.css" />
 
     <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/dark.min.css"
     />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
-
-    <!-- and it's easy to individually load additional languages -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/go.min.js"></script>
 
     <script>
         hljs.highlightAll();
@@ -27,6 +21,6 @@
 <body>
     <div class="page">
         <h1>GE Lua Documentation</h1>
-        {{CONTENT}}
+        {{PAGE_CONTENT}}
     </div>
 </body>

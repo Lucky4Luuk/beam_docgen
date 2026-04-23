@@ -1,6 +1,21 @@
 use crate::data;
 
 #[derive(Debug)]
+pub enum Node {
+    Table(Table),
+    Function(Function),
+}
+
+impl Node {
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Table(t) => &t.name,
+            Self::Function(f) => &f.name,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Table {
     pub full_name: String,
     pub name: String,
@@ -51,9 +66,31 @@ impl Table {
             child.sort_alphanumerical();
         }
     }
+
+    pub fn get_data(&self, mut path: Vec<String>) -> Option<Node> {
+        let last = path.pop()?;
+        println!("Last: {}", last);
+        if path.is_empty() {
+            if let Some(f) = self.functions.iter().find(|f| f.name == last) {
+                Some(Node::Function(f.clone()))
+            } else if let Some(t) = self.children.iter().find(|t| t.name == last) {
+                Some(Node::Table(t.clone()))
+            } else {
+                println!("Couldn't find any end node!");
+                None
+            }
+        } else {
+            if let Some(t) = self.children.iter().find(|t| t.name == last) {
+                println!("Not a root node so we continue.");
+                t.get_data(path)
+            } else {
+                None
+            }
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Function {
     pub full_name: String,
     pub name: String,

@@ -60,3 +60,10 @@ pub enum Node {
 pub struct ApiData {
     pub root: Node,
 }
+
+impl ApiData {
+    pub fn from_json(json: &str) -> anyhow::Result<Self> {
+        let s: Self = serde_json::from_str(json)?;
+        Ok(s)
+    }
+}

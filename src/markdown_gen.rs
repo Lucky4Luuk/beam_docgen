@@ -1,57 +1,41 @@
 use crate::ir::*;
 
-pub fn gen_md(root: Table) -> String {
-    let Table {
-        children,
-        functions,
-        ..
-    } = root;
-    let mut children_content = String::new();
-    for child in children {
-        children_content.push_str("<li>");
-        children_content.push_str(&table_to_md(&child));
-        children_content.push_str("</li>");
+const TABLE_TEMPLATE: &'static str = include_str!("../assets/table.md");
+const FUNC_TEMPLATE: &'static str = include_str!("../assets/function.md");
+
+pub fn gen_page_md(node: Node) -> String {
+    match node {
+        Node::Table(t) => gen_table_page_md(t),
+        Node::Function(f) => gen_function_page_md(f),
     }
-    let mut functions_content = String::new();
-    for func in functions {
-        functions_content.push_str("<li>");
-        functions_content.push_str(&function_to_md(&func));
-        functions_content.push_str("</li>");
-    }
-    format!("<ul>\n{children_content}\n{functions_content}\n</ul>")
 }
 
-fn table_to_md(table: &Table) -> String {
+pub fn gen_table_page_md(table: Table) -> String {
     let Table {
         full_name,
         name,
         children,
         functions,
     } = table;
-    let mut children_content = String::new();
+
+    let mut children_content = Vec::new();
     for child in children {
-        children_content.push_str("<li>");
-        children_content.push_str(&table_to_md(child));
-        children_content.push_str("</li>");
+        let link = child.full_name.replace(".", "/");
+        children_content.push(format!("- [`{}`]({})", child.name, link));
     }
-    let mut functions_content = String::new();
+    let mut functions_content = Vec::new();
     for func in functions {
-        functions_content.push_str("<li>");
-        functions_content.push_str(&function_to_md(func));
-        functions_content.push_str("</li>");
+        let link = func.full_name.replace(".", "/");
+        functions_content.push(format!("- [`function {}`]({})", func.name, link));
     }
-    format!(
-        "<details><summary>{full_name}</summary>
-<ul>
-{children_content}
-{functions_content}
-</ul>
-</details>
-"
-    )
+
+    TABLE_TEMPLATE
+        .replace("{{TABLE_NAME}}", &name)
+        .replace("{{TABLE_CHILDREN}}", &children_content.join("\n"))
+        .replace("{{TABLE_FUNCTIONS}}", &functions_content.join("\n"))
 }
 
-fn function_to_md(function: &Function) -> String {
+pub fn gen_function_page_md(function: Function) -> String {
     let Function {
         full_name,
         name,
@@ -59,11 +43,6 @@ fn function_to_md(function: &Function) -> String {
         func_def,
         func_def_line,
     } = function;
-    format!(
-        "<details><summary>function {full_name}</summary><pre><code class=\"language-lua\">
--- @/{source}:{func_def_line}
-{func_def}
-</code></pre></details>
-"
-    )
+
+    FUNC_TEMPLATE.replace("{{FUNCTION_NAME}}", &name)
 }

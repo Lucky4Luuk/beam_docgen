@@ -71,19 +71,16 @@ impl Table {
 
     pub fn get_data(&self, mut path: VecDeque<String>) -> Option<Node> {
         let first = path.pop_front()?;
-        println!("First: {}", first);
         if path.is_empty() {
             if let Some(f) = self.functions.iter().find(|f| f.name == first) {
                 Some(Node::Function(f.clone()))
             } else if let Some(t) = self.children.iter().find(|t| t.name == first) {
                 Some(Node::Table(t.clone()))
             } else {
-                println!("Couldn't find any end node!");
                 None
             }
         } else {
             if let Some(t) = self.children.iter().find(|t| t.name == first) {
-                println!("Not a root node so we continue.");
                 t.get_data(path)
             } else {
                 None
@@ -104,7 +101,7 @@ pub struct Function {
 
 impl Function {
     pub fn from_data_function(game_dir: &str, parent: &str, func: data::Function) -> Self {
-        let source = func.source.replace("@/", "");
+        let source = func.source.replace("@/", "").replace("@", "");
         let func_def = if func.source.contains("[C]") || func.linedefined < 0 {
             format!("function {}(...)", func.docs_name)
         } else {
@@ -112,14 +109,35 @@ impl Function {
             let func_def_line = func.linedefined.saturating_sub(1);
 
             std::fs::read_to_string(&path)
-                .ok()
                 .and_then(|contents| {
                     contents
                         .lines()
                         .nth(func_def_line as usize)
                         .map(|s| s.to_string())
+                        .ok_or(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            format!(
+                                "could not find function definition line {} in {}",
+                                func_def_line + 1,
+                                path
+                            ),
+                        ))
                 })
-                .unwrap_or_else(|| format!("function {}(...)", func.docs_name))
+                .map_err(|e| match e.kind() {
+                    std::io::ErrorKind::NotFound => String::from("source file not found"),
+                    std::io::ErrorKind::PermissionDenied => {
+                        String::from("permission denied reading")
+                    }
+                    std::io::ErrorKind::InvalidData => e.to_string(),
+                    std::io::ErrorKind::UnexpectedEof => String::from("unexpected eof"),
+                    _ => format!("failed to read {}", e),
+                })
+                .unwrap_or_else(|e| {
+                    format!(
+                        "function {}(...) -- (err reading file: {})",
+                        func.docs_name, e
+                    )
+                })
         };
 
         let full_name = format!("{parent}.{}", func.docs_name);

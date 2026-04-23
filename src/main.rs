@@ -1,7 +1,7 @@
 use markdown::{CompileOptions, Options};
 use parser::{data, ir};
 
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 use axum::{
     Router,
@@ -60,7 +60,14 @@ impl AppState {
     fn get_data(&self, path: Vec<String>) -> Option<ir::Node> {
         let first = path.first()?;
         match first.as_str() {
-            "GE" => self.ge_data.get_data(path.into_iter().skip(1).collect()),
+            "GE" => {
+                let remaining: VecDeque<String> = path.into_iter().skip(1).collect();
+                if remaining.is_empty() {
+                    Some(ir::Node::Table(self.ge_data.clone()))
+                } else {
+                    self.ge_data.get_data(remaining)
+                }
+            }
             "VE" => todo!(),
             _ => None,
         }
@@ -114,6 +121,7 @@ async fn article_resolver(
     Path(path): Path<String>,
     State(state): State<Arc<AppState>>,
 ) -> (StatusCode, Html<String>) {
+    let path = path.trim_end_matches('/').to_string();
     if let Some(content) = state.get_page(path) {
         let generated = state.template_page(&content);
         (StatusCode::OK, Html(generated))

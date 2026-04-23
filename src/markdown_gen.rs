@@ -31,6 +31,7 @@ pub fn gen_table_page_md(table: Table) -> String {
 
     TABLE_TEMPLATE
         .replace("{{TABLE_NAME}}", &name)
+        .replace("{{TABLE_FULL_NAME}}", &full_name)
         .replace("{{TABLE_CHILDREN}}", &children_content.join("\n"))
         .replace("{{TABLE_FUNCTIONS}}", &functions_content.join("\n"))
 }
@@ -44,5 +45,10 @@ pub fn gen_function_page_md(function: Function) -> String {
         func_def_line,
     } = function;
 
-    FUNC_TEMPLATE.replace("{{FUNCTION_NAME}}", &name)
+    FUNC_TEMPLATE
+        .replace("{{FUNC_NAME}}", &name)
+        .replace("{{FUNC_FULL_NAME}}", &full_name)
+        .replace("{{FUNC_SRC}}", &source)
+        .replace("{{FUNC_DEF}}", &func_def)
+        .replace("{{FUNC_DEF_LINE}}", &func_def_line.to_string())
 }

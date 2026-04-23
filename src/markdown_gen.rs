@@ -2,14 +2,22 @@ use std::collections::HashMap;
 
 use parser::{ir::*, lookup::CodeFile};
 
-const TABLE_TEMPLATE: &'static str = include_str!("../assets/table.md");
-const FUNC_TEMPLATE: &'static str = include_str!("../assets/function.md");
+const TABLE_TEMPLATE: &str = include_str!("../assets/table.md");
+const FUNC_TEMPLATE: &str = include_str!("../assets/function.md");
 
-pub fn gen_page_md(node: Node, code: &HashMap<String, CodeFile>) -> String {
+pub fn gen_page_md_template(
+    func_template: &str,
+    node: Node,
+    code: &HashMap<String, CodeFile>,
+) -> String {
     match node {
         Node::Table(t) => gen_table_page_md(t),
-        Node::Function(f) => gen_function_page_md(f, code),
+        Node::Function(f) => gen_function_page_md(func_template, f, code),
     }
+}
+
+pub fn gen_page_md(node: Node, code: &HashMap<String, CodeFile>) -> String {
+    gen_page_md_template(FUNC_TEMPLATE, node, code)
 }
 
 pub fn gen_table_page_md(table: Table) -> String {
@@ -38,7 +46,11 @@ pub fn gen_table_page_md(table: Table) -> String {
         .replace("{{TABLE_FUNCTIONS}}", &functions_content.join("\n"))
 }
 
-pub fn gen_function_page_md(function: Function, code: &HashMap<String, CodeFile>) -> String {
+pub fn gen_function_page_md(
+    func_template: &str,
+    function: Function,
+    code: &HashMap<String, CodeFile>,
+) -> String {
     let Function {
         full_name,
         name,
@@ -49,7 +61,7 @@ pub fn gen_function_page_md(function: Function, code: &HashMap<String, CodeFile>
     let func_def = if let Some(cf) = code.get(&info.source)
         && info.func_def_lines.0 >= 0
     {
-        cf.get_section(
+        cf.get_func_def_with_comments(
             info.func_def_lines.0 as usize,
             info.func_def_lines.1 as usize,
         )
@@ -78,7 +90,7 @@ pub fn gen_function_page_md(function: Function, code: &HashMap<String, CodeFile>
         }
     }
 
-    FUNC_TEMPLATE
+    func_template
         .replace("{{FUNC_NAME}}", &name)
         .replace("{{FUNC_FULL_NAME}}", &full_name)
         .replace("{{FUNC_SRC}}", &info.source)

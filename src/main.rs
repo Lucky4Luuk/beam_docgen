@@ -90,10 +90,22 @@ impl AppState {
     }
 
     fn get_page(&self, path: String) -> Option<String> {
+        let path = path.trim_start_matches('/').to_string();
+        let path_md = format!("content/{}.md", path);
+
         let path_split: Vec<_> = path.split("/").map(|s| s.to_string()).collect();
 
         let node = self.get_data(path_split)?;
-        let md = markdown_gen::gen_page_md(node, &self.code);
+        let md = if std::path::Path::new(&path_md).exists() {
+            if let Ok(content) = std::fs::read_to_string(&path_md) {
+                markdown_gen::gen_page_md_template(&content, node, &self.code)
+            } else {
+                println!("How the fuck did this happen?? What???");
+                markdown_gen::gen_page_md(node, &self.code)
+            }
+        } else {
+            markdown_gen::gen_page_md(node, &self.code)
+        };
         Some(md)
     }
 }
@@ -131,34 +143,6 @@ async fn main() {
     println!("Starting the web server now...");
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
-
-    // if let data::Node::Table(ge_table) = ge_parsed.root
-    //     && let data::Node::Table(ve_table) = ve_parsed.root
-    // {
-    //     let mut ge_node = ir::Table::from_data_table("", ge_table);
-    //     ge_node.sort_alphanumerical();
-
-    //     let mut ve_node = ir::Table::from_data_table("", ve_table);
-    //     ve_node.sort_alphanumerical();
-
-    //     let app_state = Arc::new(AppState::new(ge_node, ve_node));
-    //     println!("App state succesfully created!");
-
-    //     let app = Router::new()
-    //         .route("/", get(root))
-    //         .nest_service(
-    //             "/static",
-    //             ServiceBuilder::new().service(ServeDir::new("static")),
-    //         )
-    //         .route("/{*article_name}", get(article_resolver))
-    //         .with_state(app_state);
-
-    //     println!("Starting the web server now...");
-    //     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    //     axum::serve(listener, app).await.unwrap();
-    // } else {
-    //     panic!("Not yet supported to start with anything besides a table!");
-    // }
 }
 
 async fn root(s: State<Arc<AppState>>) -> (StatusCode, Html<String>) {

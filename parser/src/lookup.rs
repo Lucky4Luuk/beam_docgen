@@ -110,6 +110,30 @@ impl CodeFile {
         self.content[start_idx..end_idx].to_vec()
     }
 
+    pub fn get_func_def_with_comments(&self, start: usize, end: usize) -> Vec<String> {
+        let start_idx = start.saturating_sub(1);
+        let end_idx = end.min(self.content.len());
+
+        if start_idx >= end_idx {
+            return Vec::new();
+        }
+
+        let mut actual_start = start_idx;
+
+        while actual_start > 0 {
+            let prev_line = &self.content[actual_start - 1];
+            let trimmed = prev_line.trim();
+
+            if trimmed.starts_with("--") || trimmed.is_empty() {
+                actual_start -= 1;
+            } else {
+                break;
+            }
+        }
+
+        self.content[actual_start..end_idx].to_vec()
+    }
+
     pub fn get_func_call_lines(&self, lines: &[usize]) -> Vec<FuncCaller> {
         lines
             .iter()

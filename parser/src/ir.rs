@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use crate::data;
 
 #[derive(Debug)]
@@ -67,20 +69,20 @@ impl Table {
         }
     }
 
-    pub fn get_data(&self, mut path: Vec<String>) -> Option<Node> {
-        let last = path.pop()?;
-        println!("Last: {}", last);
+    pub fn get_data(&self, mut path: VecDeque<String>) -> Option<Node> {
+        let first = path.pop_front()?;
+        println!("First: {}", first);
         if path.is_empty() {
-            if let Some(f) = self.functions.iter().find(|f| f.name == last) {
+            if let Some(f) = self.functions.iter().find(|f| f.name == first) {
                 Some(Node::Function(f.clone()))
-            } else if let Some(t) = self.children.iter().find(|t| t.name == last) {
+            } else if let Some(t) = self.children.iter().find(|t| t.name == first) {
                 Some(Node::Table(t.clone()))
             } else {
                 println!("Couldn't find any end node!");
                 None
             }
         } else {
-            if let Some(t) = self.children.iter().find(|t| t.name == last) {
+            if let Some(t) = self.children.iter().find(|t| t.name == first) {
                 println!("Not a root node so we continue.");
                 t.get_data(path)
             } else {

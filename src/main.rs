@@ -71,8 +71,6 @@ impl AppState {
 
         let node = self.get_data(path_split)?;
         let md = markdown_gen::gen_page_md(node);
-        let filename = format!("generated_{}.md", path.replace("/", "_"));
-        let _ = std::fs::write(&filename, &md);
         Some(md)
     }
 }
@@ -116,10 +114,8 @@ async fn article_resolver(
     Path(path): Path<String>,
     State(state): State<Arc<AppState>>,
 ) -> (StatusCode, Html<String>) {
-    if let Some(content) = state.get_page(path.clone()) {
+    if let Some(content) = state.get_page(path) {
         let generated = state.template_page(&content);
-        let filename = format!("generated_{}.html", path.replace("/", "_"));
-        let _ = std::fs::write(&filename, &generated);
         (StatusCode::OK, Html(generated))
     } else {
         (StatusCode::NOT_FOUND, Html(state.get_404()))

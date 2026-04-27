@@ -47,6 +47,7 @@ impl AppState {
         let url_prefix = std::env::var("URL_PREFIX")
             .ok()
             .unwrap_or(String::from("http://localhost:3000"));
+        println!("URL_PREFIX = {url_prefix}");
 
         let mut all_func_names = ge_data.get_all_function_names();
         all_func_names.append(&mut ve_data.get_all_function_names());

@@ -64,9 +64,7 @@ pub fn gen_table_page_md(
     for p in full_path {
         link_builder.push(p.clone());
         let link = link_builder.join("/");
-        table_path.push(format!(
-            "<a href=\"{{URL_PREFIX}}/{link}\"><code>{p}</code></a>"
-        ));
+        table_path.push(format!("<a href=\"/{link}\"><code>{p}</code></a>"));
     }
     let table_path = table_path.join(" / ");
 

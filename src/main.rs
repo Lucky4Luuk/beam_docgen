@@ -27,6 +27,7 @@ const PAGE_404: &str = include_str!("../assets/404.md");
 
 struct AppState {
     html_template: String,
+    url_prefix: String,
 
     ge_data: Table,
     ve_data: Table,
@@ -43,6 +44,10 @@ impl AppState {
         let html_template =
             std::fs::read_to_string("assets/template.html").expect("Could not find HTML template!");
 
+        let url_prefix = std::env::var("URL_PREFIX")
+            .ok()
+            .unwrap_or(String::from("http://localhost:3000"));
+
         let mut all_func_names = ge_data.get_all_function_names();
         all_func_names.append(&mut ve_data.get_all_function_names());
 
@@ -51,6 +56,7 @@ impl AppState {
 
         Self {
             html_template,
+            url_prefix,
 
             ge_data,
             ve_data,
@@ -78,7 +84,7 @@ impl AppState {
         self.html_template
             .replace("{{TLN}}", tln)
             .replace("{{PAGE_CONTENT}}", &md_html)
-            .replace("{{URL_PREFIX}}", "http://localhost:3000")
+            .replace("{{URL_PREFIX}}", &self.url_prefix)
     }
 
     fn get_root(&self) -> String {

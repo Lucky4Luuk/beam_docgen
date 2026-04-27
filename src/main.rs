@@ -46,7 +46,7 @@ impl AppState {
 
         let url_prefix = std::env::var("URL_PREFIX")
             .ok()
-            .unwrap_or(String::from("http://localhost:3000"));
+            .unwrap_or(String::from("http://localhost:3030"));
         println!("URL_PREFIX = {url_prefix}");
 
         let mut all_func_names = ge_data.get_all_function_names();
@@ -285,7 +285,7 @@ async fn main() {
         .with_state(app_state);
 
     println!("Starting the web server now...");
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3030").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 

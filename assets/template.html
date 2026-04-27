@@ -2,12 +2,8 @@
 <html>
     <header>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <!--<link
-        rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/sakura.css/css/sakura.css"
-        type="text/css"
-    />-->
         <link rel="stylesheet" href="{{URL_PREFIX}}/static/sakura.css" />
+        <link rel="stylesheet" href="{{URL_PREFIX}}/static/override.css" />
 
         <link
             rel="stylesheet"
@@ -18,8 +14,49 @@
 
         <script>
             hljs.highlightAll();
-            hljs.initLineNumbersOnLoad();
 
+            let wantsLuaHighlight = false;
+
+            function highlightLuaSpans() {
+                document
+                    .querySelectorAll("code.hl:not(.hljs)")
+                    .forEach((el) => {
+                        const result = hljs.highlight(el.textContent, {
+                            language: "lua",
+                        });
+
+                        el.innerHTML = result.value;
+                        el.classList.add("hljs");
+                    });
+            }
+
+            function bootLuaHighlight() {
+                highlightLuaSpans();
+            }
+
+            function initLuaHighlight() {
+                if (document.readyState === "loading") {
+                    if (!wantsLuaHighlight) {
+                        window.addEventListener(
+                            "DOMContentLoaded",
+                            bootLuaHighlight,
+                            false,
+                        );
+                    }
+                    wantsLuaHighlight = true;
+                    return;
+                }
+
+                highlightLuaSpans();
+            }
+
+            // run immediately
+            initLuaHighlight();
+
+            hljs.initLineNumbersOnLoad();
+        </script>
+
+        <script>
             document.addEventListener("DOMContentLoaded", function () {
                 const searchInput = document.getElementById("doc-search");
                 const pageContent = document.getElementById("page-content");
@@ -179,27 +216,6 @@
                 });
             });
         </script>
-
-        <style>
-            a {
-                font-style: italic;
-                text-decoration: underline;
-            }
-
-            a code {
-                font-style: normal;
-            }
-
-            strong a {
-                font-style: normal;
-            }
-
-            /* this doesnt seem to work */
-            a h1 {
-                text-decoration: none;
-                pointer-events: none;
-            }
-        </style>
     </header>
 
     <body>

@@ -126,16 +126,16 @@ impl AppState {
         let path_split: Vec<_> = path.split("/").map(|s| s.to_string()).collect();
         let first = path_split.first()?.clone();
 
-        let node = self.get_data(path_split)?;
+        let node = self.get_data(path_split.clone())?;
         let md = if std::path::Path::new(&path_md).exists() {
             if let Ok(content) = std::fs::read_to_string(&path_md) {
-                markdown_gen::gen_page_md_template(&content, node, &self.code)
+                markdown_gen::gen_page_md_template(&content, path_split, node, &self.code)
             } else {
-                println!("How the fuck did this happen?? What???");
-                markdown_gen::gen_page_md(node, &self.code)
+                println!("How the fuck did this happen?? What??? Path: {path}");
+                markdown_gen::gen_page_md(path_split, node, &self.code)
             }
         } else {
-            markdown_gen::gen_page_md(node, &self.code)
+            markdown_gen::gen_page_md(path_split, node, &self.code)
         };
         Some((first, md))
     }

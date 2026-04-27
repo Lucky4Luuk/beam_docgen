@@ -1,0 +1,22 @@
+a {
+    font-style: italic;
+    text-decoration: underline;
+}
+
+a:has(code) {
+    font-style: normal;
+    text-decoration: none;
+}
+
+a:has(code):hover {
+    text-decoration: underline;
+}
+
+strong a {
+    font-style: normal;
+}
+
+/* this doesnt seem to work */
+a:has(h1) {
+    text-decoration: none;
+}

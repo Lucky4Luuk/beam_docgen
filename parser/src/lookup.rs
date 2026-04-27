@@ -99,6 +99,10 @@ impl CodeFile {
             .collect()
     }
 
+    pub fn get_line(&self, line: usize) -> Option<&String> {
+        self.content.get(line)
+    }
+
     pub fn get_section(&self, start: usize, end: usize) -> Vec<String> {
         let start_idx = start.saturating_sub(1);
         let end_idx = end.min(self.content.len());
@@ -110,7 +114,25 @@ impl CodeFile {
         self.content[start_idx..end_idx].to_vec()
     }
 
-    pub fn get_func_def_with_comments(&self, start: usize, end: usize) -> Vec<String> {
+    /// Specifically searches from line down to find the actual definition starting with `function`
+    /// Searches down a maximum of 5 lines. Specifically only finds lines
+    /// starting with `function`, because we don't really need this for
+    /// any functions that are defined in other ways
+    pub fn get_func_def(&self, line: usize) -> Option<String> {
+        for i in line..(line + 5) {
+            if let Some(s) = self.get_line(i) {
+                let s = s.trim_start();
+                if s.starts_with("function") {
+                    return Some(s.to_string());
+                } else if s.starts_with("local function") {
+                    return Some(s[6..].to_string());
+                }
+            }
+        }
+        None
+    }
+
+    pub fn get_func_decl_with_comments(&self, start: usize, end: usize) -> Vec<String> {
         let start_idx = start.saturating_sub(1);
         let end_idx = end.min(self.content.len());
 

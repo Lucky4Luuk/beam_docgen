@@ -7,29 +7,68 @@ const FUNC_TEMPLATE: &str = include_str!("../assets/function.md");
 
 pub fn gen_page_md_template(
     template: &str,
+    full_path: Vec<String>,
     node: Node,
     code: &HashMap<String, CodeFile>,
 ) -> String {
     match node {
-        Node::Table(t) => gen_table_page_md(template, t),
+        Node::Table(t) => gen_table_page_md(template, full_path, t, code),
         Node::Function(f) => gen_function_page_md(template, f, code),
     }
 }
 
-pub fn gen_page_md(node: Node, code: &HashMap<String, CodeFile>) -> String {
+pub fn gen_page_md(full_path: Vec<String>, node: Node, code: &HashMap<String, CodeFile>) -> String {
     match node {
-        Node::Table(_) => gen_page_md_template(TABLE_TEMPLATE, node, code),
-        Node::Function(_) => gen_page_md_template(FUNC_TEMPLATE, node, code),
+        Node::Table(_) => gen_page_md_template(TABLE_TEMPLATE, full_path, node, code),
+        Node::Function(_) => gen_page_md_template(FUNC_TEMPLATE, full_path, node, code),
     }
 }
 
-pub fn gen_table_page_md(template: &str, table: Table) -> String {
+fn func_inline_md(func: &Function, code: &HashMap<String, CodeFile>) -> String {
+    let link = func.full_name.replace(".", "/");
+
+    let func_def_default = format!("function {}(...)", func.name);
+    let func_def = match func.name.as_str() {
+        "__index" | "__newindex" => func_def_default.clone(),
+        _ => code
+            .get(&func.info.source)
+            .and_then(|cf| {
+                if func.info.func_def_lines.0 > 0 {
+                    cf.get_func_def((func.info.func_def_lines.0 as usize).saturating_sub(1))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| func_def_default.clone()),
+    }
+    .trim_start()
+    .to_string();
+    format!("- [<code class=\"hl\">{}</code>](<{}>)", func_def, link)
+}
+
+pub fn gen_table_page_md(
+    template: &str,
+    full_path: Vec<String>,
+    table: Table,
+    code: &HashMap<String, CodeFile>,
+) -> String {
     let Table {
         full_name,
         name,
         children,
         functions,
     } = table;
+
+    let mut table_path = Vec::new();
+    let mut link_builder = Vec::new();
+    for p in full_path {
+        link_builder.push(p.clone());
+        let link = link_builder.join("/");
+        table_path.push(format!(
+            "<a href=\"{{URL_PREFIX}}/{link}\"><code>{p}</code></a>"
+        ));
+    }
+    let table_path = table_path.join(" / ");
 
     let mut children_content = Vec::new();
     for child in children {
@@ -38,11 +77,12 @@ pub fn gen_table_page_md(template: &str, table: Table) -> String {
     }
     let mut functions_content = Vec::new();
     for func in functions {
-        let link = func.full_name.replace(".", "/");
-        functions_content.push(format!("- [`function {}`](<{}>)", func.name, link));
+        let s = func_inline_md(&func, code);
+        functions_content.push(s);
     }
 
     template
+        .replace("{{TABLE_PATH}}", &table_path)
         .replace("{{TABLE_NAME}}", &name)
         .replace("{{TABLE_FULL_NAME}}", &full_name)
         .replace("{{TABLE_CHILDREN}}", &children_content.join("\n"))
@@ -64,7 +104,7 @@ pub fn gen_function_page_md(
     let func_def = if let Some(cf) = code.get(&info.source)
         && info.func_def_lines.0 >= 0
     {
-        cf.get_func_def_with_comments(
+        cf.get_func_decl_with_comments(
             info.func_def_lines.0 as usize,
             info.func_def_lines.1 as usize,
         )

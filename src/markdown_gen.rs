@@ -99,17 +99,29 @@ pub fn gen_function_page_md(
         callers,
     } = function;
 
-    let func_def = if let Some(cf) = code.get(&info.source)
+    let (func_def_code, offset) = if let Some(cf) = code.get(&info.source)
         && info.func_def_lines.0 >= 0
     {
-        cf.get_func_decl_with_comments(
+        let (fd, offset) = cf.get_func_decl_with_comments(
             info.func_def_lines.0 as usize,
             info.func_def_lines.1 as usize,
-        )
-        .join("\n")
+        );
+        (fd.join("\n"), offset)
     } else {
-        format!("function {name}(...)")
+        (format!("function {name}(...)"), 0)
     };
+
+    let func_def_line_start = (info.func_def_lines.0.max(0) as usize)
+        .saturating_sub(offset + 2)
+        .max(0);
+
+    let func_def = format!(
+        "<pre><code class=\"highlight-lua\" data-ln-start-from=\"{func_def_line_start}\">
+-- @/{}:{}
+{func_def_code}
+</code></pre>",
+        info.source, info.func_def_lines.0
+    );
 
     let mut func_callers = Vec::new();
     for (src, line_numbers) in &callers {
@@ -121,7 +133,7 @@ pub fn gen_function_page_md(
                 }
                 let call_code = cf.get_section(i - 1, i + 1).join("\n");
                 s.push(format!(
-                    "<pre><code class=\"highlight-lua\" data-ln-start-from=\"{}\">{call_code}</code></pre>", i - 1
+                    "<pre><code class=\"highlight-lua\" data-ln-start-from=\"{}\">{call_code}</code></pre>", i.saturating_sub(1)
                 ));
             }
             if s.len() > 1 {
@@ -136,6 +148,6 @@ pub fn gen_function_page_md(
         .replace("{{FUNC_FULL_NAME}}", &full_name)
         .replace("{{FUNC_SRC}}", &info.source)
         .replace("{{FUNC_DEF}}", &func_def)
-        .replace("{{FUNC_DEF_LINE}}", &info.func_def_lines.0.to_string())
+        .replace("{{FUNC_DEF_LINE}}", &(info.func_def_lines.0).to_string())
         .replace("{{FUNC_CALLERS}}", &func_callers.join("\n"))
 }

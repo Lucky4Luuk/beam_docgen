@@ -132,15 +132,16 @@ impl CodeFile {
         None
     }
 
-    pub fn get_func_decl_with_comments(&self, start: usize, end: usize) -> Vec<String> {
+    pub fn get_func_decl_with_comments(&self, start: usize, end: usize) -> (Vec<String>, usize) {
         let start_idx = start.saturating_sub(1);
         let end_idx = end.min(self.content.len());
 
         if start_idx >= end_idx {
-            return Vec::new();
+            return (Vec::new(), 0);
         }
 
         let mut actual_start = start_idx;
+        let mut offset = 0;
 
         while actual_start > 0 {
             let prev_line = &self.content[actual_start - 1];
@@ -148,12 +149,13 @@ impl CodeFile {
 
             if trimmed.starts_with("--") || trimmed.is_empty() {
                 actual_start -= 1;
+                offset += 1;
             } else {
                 break;
             }
         }
 
-        self.content[actual_start..end_idx].to_vec()
+        (self.content[actual_start..end_idx].to_vec(), offset)
     }
 
     pub fn get_func_call_lines(&self, lines: &[usize]) -> Vec<FuncCaller> {
